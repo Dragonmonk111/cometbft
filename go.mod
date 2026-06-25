@@ -1,6 +1,8 @@
 module github.com/cometbft/cometbft
 
-go 1.22.11
+// Project Aegis Phase C: bumped 1.22.11 -> 1.24.0 to use the stdlib crypto/mlkem
+// (ML-KEM-768, FIPS 203) in the hybrid secret connection (secret_connection_hybrid.go).
+go 1.24.0
 
 require (
 	github.com/BurntSushi/toml v1.4.0
@@ -56,7 +58,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.3.7 // indirect
+	github.com/cloudflare/circl v1.6.1 // Project Aegis Phase F: ML-DSA-44 (FIPS 204) hybrid consensus key (ADR-008)
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect

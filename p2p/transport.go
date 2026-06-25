@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"golang.org/x/net/netutil"
@@ -589,12 +590,31 @@ func upgradeSecretConn(
 		return nil, err
 	}
 
-	sc, err := conn.MakeSecretConnection(c, privKey)
+	var (
+		sc  *conn.SecretConnection
+		err error
+	)
+	if aegisHybridTransportEnabled() {
+		// Project Aegis Phase C: post-quantum-hybrid X25519 + ML-KEM-768 handshake.
+		sc, err = conn.MakeSecretConnectionHybrid(c, privKey)
+	} else {
+		sc, err = conn.MakeSecretConnection(c, privKey)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	return sc, sc.SetDeadline(time.Time{})
+}
+
+// aegisHybridTransportEnabled reports whether the post-quantum-hybrid secret
+// connection handshake (ADR-006) should be used instead of the classical one.
+// Gated by AEGIS_HYBRID_TRANSPORT=1 so a single binary can run either path for
+// A/B real-link RTT measurement (Phase C6). Both peers must enable it; a hybrid
+// peer cannot talk to a classical peer.
+func aegisHybridTransportEnabled() bool {
+	v := os.Getenv("AEGIS_HYBRID_TRANSPORT")
+	return v == "1" || v == "true"
 }
 
 func resolveIPs(resolver IPResolver, c net.Conn) ([]net.IP, error) {
