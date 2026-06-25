@@ -462,13 +462,19 @@ func TestBlockMaxDataBytes(t *testing.T) {
 		panics        bool
 		result        int64
 	}{
+		// Aegis (ADR-008 §F2): with hybrid signatures MaxCommitBytes(n) =
+		// 94 + (2537+3)*n, and the fixed header/block overhead is 637, so the
+		// per-block overhead is 637 + MaxCommitBytes(n) + evidenceBytes:
+		//   valsCount=1, evidence=0   -> 3271
+		//   valsCount=2, evidence=0   -> 5811
+		//   valsCount=2, evidence=100 -> 5911
 		0: {-10, 1, 0, true, 0},
 		1: {10, 1, 0, true, 0},
-		2: {841, 1, 0, true, 0},
-		3: {842, 1, 0, false, 0},
-		4: {843, 1, 0, false, 1},
-		5: {954, 2, 0, false, 1},
-		6: {1053, 2, 100, false, 0},
+		2: {3270, 1, 0, true, 0},
+		3: {3271, 1, 0, false, 0},
+		4: {3272, 1, 0, false, 1},
+		5: {5812, 2, 0, false, 1},
+		6: {5911, 2, 100, false, 0},
 	}
 
 	for i, tc := range testCases {
@@ -493,11 +499,13 @@ func TestBlockMaxDataBytesNoEvidence(t *testing.T) {
 		panics    bool
 		result    int64
 	}{
+		// Aegis (ADR-008 §F2): per-block overhead for valsCount=1 is
+		// 637 + MaxCommitBytes(1) = 637 + 2634 = 3271 (hybrid signatures).
 		0: {-10, 1, true, 0},
 		1: {10, 1, true, 0},
-		2: {841, 1, true, 0},
-		3: {842, 1, false, 0},
-		4: {843, 1, false, 1},
+		2: {3270, 1, true, 0},
+		3: {3271, 1, false, 0},
+		4: {3272, 1, false, 1},
 	}
 
 	for i, tc := range testCases {

@@ -592,10 +592,21 @@ const (
 const (
 	// Max size of commit without any commitSigs -> 82 for BlockID, 8 for Height, 4 for Round.
 	MaxCommitOverheadBytes int64 = 94
-	// Commit sig size is made up of 64 bytes for the signature, 20 bytes for the address,
-	// 1 byte for the flag and 14 bytes for the timestamp
-	MaxCommitSigBytes int64 = 109
 )
+
+// MaxCommitSigBytes is the maximum size of a proto-encoded CommitSig.
+//
+// The non-signature content plus its proto framing is 43 bytes (20 B address,
+// 14 B timestamp, 1 B flag, and the field tags/length-prefixes). The signature
+// field then adds its 1-byte tag, a 2-byte length prefix (consensus signatures
+// now exceed 127 B), and the MaxSignatureSize-byte payload.
+//
+// Project Aegis (ADR-008 §F2): with hybrid Ed25519+ML-DSA-44 signatures
+// MaxSignatureSize is 2,491 B, so this is 2,537 B (was 109 B for classical
+// 64 B Ed25519). MaxCommitBytes/block-size accounting therefore tracks the
+// real hybrid commit size. TestMaxCommitBytes asserts the exact value against a
+// real proto encoding.
+var MaxCommitSigBytes = 43 + 1 + 2 + int64(MaxSignatureSize)
 
 // CommitSig is a part of the Vote included in a Commit.
 type CommitSig struct {
@@ -606,8 +617,11 @@ type CommitSig struct {
 }
 
 func MaxCommitBytes(valCount int) int64 {
-	// From the repeated commit sig field
-	var protoEncodingOverhead int64 = 2
+	// From the repeated commit sig field: 1 byte for the field tag plus the
+	// length prefix of each CommitSig. With Aegis hybrid signatures (ADR-008
+	// §F2) a CommitSig is MaxCommitSigBytes (2,537 B), so its length prefix is
+	// 2 bytes (was 1 byte for the classical 109 B CommitSig) -> 3 bytes total.
+	var protoEncodingOverhead int64 = 3
 	return MaxCommitOverheadBytes + ((MaxCommitSigBytes + protoEncodingOverhead) * int64(valCount))
 }
 
