@@ -13,5 +13,8 @@ message PublicKey {
   oneof sum {
     bytes ed25519   = 1;
     bytes secp256k1 = 2;
+    // ADR-008 §F4: hybrid Ed25519 + ML-DSA-44 consensus pubkey.
+    // Wire format: ed25519(32) || mldsa44(1312) = 1344 bytes.
+    bytes aegis_hybrid_ed25519_mldsa44 = 3;
   }
 }
