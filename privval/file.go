@@ -11,6 +11,8 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/hybrid"
+	"github.com/cometbft/cometbft/crypto/mldsa44"
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
 	cmtjson "github.com/cometbft/cometbft/libs/json"
 	cmtos "github.com/cometbft/cometbft/libs/os"
@@ -157,6 +159,10 @@ func (lss *FilePVLastSignState) Save() {
 type FilePV struct {
 	Key           FilePVKey
 	LastSignState FilePVLastSignState
+
+	// PQCSidecar is the optional ML-DSA-44 half for hybrid consensus signing
+	// (Project Aegis Phase F, ADR-008 §F4). Nil means classical-only.
+	PQCSidecar *FilePVKeyMlDsa44
 }
 
 // NewFilePV generates a new validator from the given key and paths.
@@ -252,9 +258,20 @@ func (pv *FilePV) GetAddress() types.Address {
 }
 
 // GetPubKey returns the public key of the validator.
-// Implements PrivValidator.
+// When a PQC sidecar is present, returns the hybrid pubkey (same Address as
+// classical, ADR-008 §F1-b). Implements PrivValidator.
 func (pv *FilePV) GetPubKey() (crypto.PubKey, error) {
-	return pv.Key.PubKey, nil
+	if pv.PQCSidecar == nil {
+		return pv.Key.PubKey, nil
+	}
+	hp, err := hybrid.NewPrivKeyFromHalves(
+		pv.Key.PrivKey.(ed25519.PrivKey),
+		pv.PQCSidecar.PrivKey.(mldsa44.PrivKey),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("aegis hybrid key composition: %w", err)
+	}
+	return hp.PubKey(), nil
 }
 
 // SignVote signs a canonical representation of the vote, along with the
@@ -279,6 +296,9 @@ func (pv *FilePV) SignProposal(chainID string, proposal *cmtproto.Proposal) erro
 func (pv *FilePV) Save() {
 	pv.Key.Save()
 	pv.LastSignState.Save()
+	if pv.PQCSidecar != nil {
+		pv.PQCSidecar.Save()
+	}
 }
 
 // Reset resets all fields in the FilePV.
@@ -325,7 +345,7 @@ func (pv *FilePV) signVote(chainID string, vote *cmtproto.Vote) error {
 	var extSig []byte
 	if vote.Type == cmtproto.PrecommitType && !types.ProtoBlockIDIsNil(&vote.BlockID) {
 		extSignBytes := types.VoteExtensionSignBytes(chainID, vote)
-		extSig, err = pv.Key.PrivKey.Sign(extSignBytes)
+		extSig, err = pv.signingPrivKey().Sign(extSignBytes)
 		if err != nil {
 			return err
 		}
@@ -356,7 +376,7 @@ func (pv *FilePV) signVote(chainID string, vote *cmtproto.Vote) error {
 	}
 
 	// It passed the checks. Sign the vote
-	sig, err := pv.Key.PrivKey.Sign(signBytes)
+	sig, err := pv.signingPrivKey().Sign(signBytes)
 	if err != nil {
 		return err
 	}
@@ -400,7 +420,7 @@ func (pv *FilePV) signProposal(chainID string, proposal *cmtproto.Proposal) erro
 	}
 
 	// It passed the checks. Sign the proposal
-	sig, err := pv.Key.PrivKey.Sign(signBytes)
+	sig, err := pv.signingPrivKey().Sign(signBytes)
 	if err != nil {
 		return err
 	}
