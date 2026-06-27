@@ -66,9 +66,14 @@ func sidecarPath(keyFilePath string) string {
 // GenFilePVWithPQC generates a fresh classical + ML-DSA-44 hybrid validator.
 // The classical key is stored at keyFilePath; the PQC half at keyFilePath_mldsa44.json.
 func GenFilePVWithPQC(keyFilePath, stateFilePath string) *FilePV {
-	ed := ed25519.GenPrivKey()
-	ml := mldsa44.GenPrivKey()
+	return NewFilePVWithPQC(ed25519.GenPrivKey(), mldsa44.GenPrivKey(), keyFilePath, stateFilePath)
+}
 
+// NewFilePVWithPQC builds a hybrid FilePV from existing ed25519 and ML-DSA-44
+// halves. The classical key is stored at keyFilePath; the PQC half at
+// keyFilePath_mldsa44.json. Used when both halves are derived from a seed or
+// mnemonic rather than generated randomly.
+func NewFilePVWithPQC(ed crypto.PrivKey, ml crypto.PrivKey, keyFilePath, stateFilePath string) *FilePV {
 	pv := NewFilePV(ed, keyFilePath, stateFilePath)
 	pv.PQCSidecar = &FilePVKeyMlDsa44{
 		Address:  types.Address(ml.PubKey().Address()), // distinct PQC address space
