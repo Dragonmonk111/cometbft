@@ -12,6 +12,9 @@ on:
 
 jobs:
   fuzz-nightly-test:
+    # Aegis fork: skip on forks so this inherited upstream fuzz job does not
+    # fail CI on aegis-phase-cf-hybrid. Runs only on the canonical cometbft repo.
+    if: github.repository == 'cometbft/cometbft'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v5
@@ -73,7 +76,9 @@ jobs:
 
   fuzz-nightly-fail:
     needs: fuzz-nightly-test
-    if: ${{ needs.fuzz-nightly-test.outputs.crashers-count != 0 }}
+    # Aegis fork: also gate the Slack-notify job to the canonical repo (the
+    # SLACK_WEBHOOK_URL secret does not exist on the fork).
+    if: ${{ github.repository == 'cometbft/cometbft' && needs.fuzz-nightly-test.outputs.crashers-count != 0 }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify Slack on failure
